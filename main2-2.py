@@ -1,4 +1,5 @@
 from collections import UserDict
+import re
 
 
 class Field:
@@ -15,32 +16,28 @@ class Name(Field):
 
 class Phone(Field):
     def __init__(self, value):
-        if len(value) == 10 and value.isdigit():
-            super().__init__(value)
-        else:
-            raise ValueError("Phone number must be 10 digits")
+        if not re.fullmatch(r'\d{10}', value):
+            raise ValueError("Invalid phone number. Must be 10 digits.")
+        super().__init__(value)
 
 
 class Record:
-    def __init__(self, name):
-        self.name = Name(name)
-        self.phones = []
+    def __init__(self, name_value, phones=None):
+        self.name = Name(name_value)
+        self.phones = phones if phones is not None else []
 
     def add_phone(self, phone):
         self.phones.append(Phone(phone))
 
     def remove_phone(self, phone):
-        phone_to_remove = Phone(phone)
-        for p in self.phones:
-            if p.value == phone_to_remove.value:
-                self.phones.remove(p)
-                return
+        phone_to_remove = self.find_phone(phone)
+        if phone_to_remove:
+            self.phones.remove(phone_to_remove)
 
     def edit_phone(self, old_phone, new_phone):
-        for idx, phone in enumerate(self.phones):
-            if phone.value == old_phone:
-                self.phones[idx] = Phone(new_phone)
-                return
+        phone_to_edit = self.find_phone(old_phone)
+        if phone_to_edit:
+            phone_to_edit.value = new_phone
 
     def find_phone(self, phone):
         for p in self.phones:
@@ -49,85 +46,43 @@ class Record:
         return None
 
     def __str__(self):
-        return f"Contact name: {self.name}, phones: {'; '.join(str(p) for p in self.phones)}"
+        return f"Contact name: {self.name.value}, phones: {'; '.join(p.value for p in self.phones)}"
 
 
 class AddressBook(UserDict):
-    def add_record(self, record):
-        self.data[record.name.value] = record
+    def add_record(self, record_inf):
+        self.data[record_inf.name.value] = record_inf
 
-    def find(self, name):
-        return self.data.get(name)
+    def find(self, name_key):
+        return self.data.get(name_key)
 
-    def delete(self, name):
-        if name in self.data:
-            del self.data[name]
-
-
-def parse_input(user_input):
-    cmd, *args = user_input.split()
-    cmd = cmd.strip().lower()
-    return cmd, args
+    def delete(self, name_key):
+        if name_key in self.data:
+            del self.data[name_key]
 
 
-def main():
-    book = AddressBook()
-    print("Welcome to the assistant bot!")
-    while True:
-        user_input = input("Enter a command: ")
-        command, args = parse_input(user_input)
+book = AddressBook()
 
-        if command in ["close", "exit"]:
-            print("Good bye!")
-            break
+john_record = Record("John")
+john_record.add_phone("1234567890")
+john_record.add_phone("5555555555")
 
-        elif command == "hello":
-            print("How can I help you?")
+book.add_record(john_record)
 
-        elif command == "add":
-            try:
-                record = Record(args[0])
-                record.add_phone(args[1])
-                book.add_record(record)
-                print(f"Contact {args[0]} added.")
-            except IndexError:
-                print("Invalid format. Use: add [name] [phone]")
+jane_record = Record("Jane")
+jane_record.add_phone("9876543210")
+book.add_record(jane_record)
 
-        elif command == "change":
-            try:
-                record = book.find(args[0])
-                if record:
-                    record.edit_phone(args[1], args[2])
-                    print(f"Phone for {args[0]} changed.")
-                else:
-                    print("Contact not found.")
-            except IndexError:
-                print("Invalid format. Use: change [name] [old phone] [new phone]")
+for record_name, record in book.data.items():
+    print(record)
 
-        elif command == "phone":
-            try:
-                record = book.find(args[0])
-                if record:
-                    print(f"Phones for {args[0]}: {', '.join(p.value for p in record.phones)}")
-                else:
-                    print("Contact not found.")
-            except IndexError:
-                print("Invalid format. Use: phone [name]")
+john = book.find("John")
+if john:
+    john.edit_phone("1234567890", "1112223333")
+    print(john)
 
-        elif command == "all":
-            for name, record in book.data.items():
-                print(record)
+found_phone = john.find_phone("5555555555") if john else None
+if found_phone:
+    print(f"{john.name}: {found_phone}")
 
-        elif command == "remove":
-            try:
-                book.delete(args[0])
-                print(f"Contact {args[0]} removed.")
-            except IndexError:
-                print("Invalid format. Use: remove [name]")
-
-        else:
-            print("Invalid command.")
-
-
-if __name__ == "__main__":
-    main()
+book.delete("Jane")
